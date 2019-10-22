@@ -337,4 +337,49 @@ public class BasicGeneratorFilteringTest extends BaseTest
         gen.close();
         assertEquals(aposToQuotes("{'field1':{},'field2':'val2'}"), w.toString());
     }
+
+    static class ExampleFilter extends TokenFilter
+    {
+        private final Set<String> _names;
+
+        public ExampleFilter(String... names) {
+            _names = new HashSet<String>(Arrays.asList(names));
+        }
+
+        @Override
+        public TokenFilter includeProperty(String name) {
+            if (_names.contains(name)) {
+                return TokenFilter.INCLUDE_ALL;
+            }
+            return null;
+        }
+    }
+
+    public void testJacksonIssueWorkingExample() throws Exception
+    {
+        StringWriter w = new StringWriter();
+
+        FilteringGeneratorDelegate gen = new FilteringGeneratorDelegate(JSON_F.createGenerator(w),
+                new ExampleFilter("id", "name"),
+                true, true);
+        final String singleObject = "{'id':123,'name':'abc','other':'def'}";
+        final String JSON = String.format("[%s,%s,%s]", singleObject, singleObject, singleObject);
+        writeJsonDoc(JSON_F, JSON, gen);
+        assertEquals(aposToQuotes("[{'id':123,'name':'abc'},{'id':123,'name':'abc'},{'id':123,'name':'abc'}]"), w.toString());
+        assertEquals(2 * 3, gen.getMatchCount());
+    }
+
+  public void testJacksonIssueFailingExample() throws Exception
+  {
+    StringWriter w = new StringWriter();
+
+    FilteringGeneratorDelegate gen = new FilteringGeneratorDelegate(JSON_F.createGenerator(w),
+        new ExampleFilter("fake"),
+        true, true);
+    final String singleObject = "{'id':123,'name':'abc','other':'def'}";
+    final String JSON = String.format("[%s,%s,%s]", singleObject, singleObject, singleObject);
+    writeJsonDoc(JSON_F, JSON, gen);
+    assertEquals(aposToQuotes("[{},{},{}]"), w.toString());
+    assertEquals(0, gen.getMatchCount());
+  }
 }
